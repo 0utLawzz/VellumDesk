@@ -1,0 +1,327 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Global Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedEmail() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // --- Validation Blueprints ---
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'displayName', 'role', 'storagePreference', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'photoURL', 'role', 'storagePreference', 'createdAt', 'updatedAt'])
+        && data.uid == userId
+        && data.uid == request.auth.uid
+        && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500))
+        && data.role == 'member'
+        && data.storagePreference in ['standard_cloud', 'vault_restricted']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTemplate(data, templateId) {
+      return data.keys().hasAll(['id', 'ownerId', 'name', 'category', 'description', 'tone', 'jurisdiction', 'sections', 'variables', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'name', 'category', 'description', 'tone', 'jurisdiction', 'sections', 'variables', 'createdAt', 'updatedAt'])
+        && data.id == templateId
+        && isValidId(data.id)
+        && isValidId(data.ownerId)
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 140
+        && data.category in ['contract', 'report']
+        && data.description is string && data.description.size() <= 600
+        && data.tone in ['formal_legal', 'executive_concise', 'boardroom_analytical', 'commercial_balanced']
+        && data.jurisdiction is string && data.jurisdiction.size() <= 120
+        && data.sections is list && data.sections.size() >= 1 && data.sections.size() <= 20
+        && data.sections[0] is map
+        && data.variables is list && data.variables.size() <= 20
+        && (data.variables.size() == 0 || data.variables[0] is string)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidDocument(data, documentId) {
+      return data.keys().hasAll(['id', 'ownerId', 'ownerName', 'title', 'category', 'templateId', 'templateName', 'status', 'visibility', 'storageTier', 'sharedEmails', 'metadata', 'sections', 'currentVersion', 'wordCount', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'ownerName', 'title', 'category', 'templateId', 'templateName', 'status', 'visibility', 'storageTier', 'sharedEmails', 'metadata', 'sections', 'currentVersion', 'wordCount', 'createdAt', 'updatedAt'])
+        && data.id == documentId
+        && isValidId(data.id)
+        && isValidId(data.ownerId)
+        && data.ownerName is string && data.ownerName.size() >= 1 && data.ownerName.size() <= 120
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && data.category in ['contract', 'report']
+        && data.templateId is string && data.templateId.size() >= 1 && data.templateId.size() <= 128
+        && data.templateName is string && data.templateName.size() >= 1 && data.templateName.size() <= 140
+        && data.status in ['draft', 'in_review', 'approved', 'archived']
+        && data.visibility in ['private', 'shared']
+        && data.storageTier in ['standard_cloud', 'vault_restricted']
+        && data.sharedEmails is list && data.sharedEmails.size() <= 15
+        && (data.sharedEmails.size() == 0 || data.sharedEmails[0] is string)
+        && data.metadata is map && data.metadata.keys().size() <= 16
+        && data.sections is list && data.sections.size() >= 1 && data.sections.size() <= 30
+        && data.sections[0] is map
+        && data.currentVersion is int && data.currentVersion >= 1 && data.currentVersion <= 10000
+        && data.wordCount is int && data.wordCount >= 0 && data.wordCount <= 500000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidVersion(data, documentId, versionId) {
+      return data.keys().hasAll(['id', 'documentId', 'docOwnerId', 'docVisibility', 'docSharedEmails', 'versionNumber', 'label', 'changeSummary', 'authorId', 'authorName', 'title', 'sections', 'createdAt'])
+        && data.keys().hasOnly(['id', 'documentId', 'docOwnerId', 'docVisibility', 'docSharedEmails', 'versionNumber', 'label', 'changeSummary', 'authorId', 'authorName', 'title', 'sections', 'createdAt'])
+        && data.id == versionId
+        && data.documentId == documentId
+        && isValidId(data.id)
+        && isValidId(data.documentId)
+        && isValidId(data.docOwnerId)
+        && data.docVisibility in ['private', 'shared']
+        && data.docSharedEmails is list && data.docSharedEmails.size() <= 15
+        && (data.docSharedEmails.size() == 0 || data.docSharedEmails[0] is string)
+        && data.versionNumber is int && data.versionNumber >= 1 && data.versionNumber <= 10000
+        && data.label is string && data.label.size() >= 1 && data.label.size() <= 160
+        && data.changeSummary is string && data.changeSummary.size() <= 500
+        && isValidId(data.authorId)
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 120
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && data.sections is list && data.sections.size() >= 1 && data.sections.size() <= 30
+        && data.sections[0] is map
+        && data.createdAt is timestamp;
+    }
+
+    function isValidComment(data, documentId, commentId) {
+      return data.keys().hasAll(['id', 'documentId', 'docOwnerId', 'docVisibility', 'docSharedEmails', 'sectionId', 'sectionHeading', 'authorId', 'authorName', 'body', 'resolved', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'documentId', 'docOwnerId', 'docVisibility', 'docSharedEmails', 'sectionId', 'sectionHeading', 'authorId', 'authorName', 'body', 'resolved', 'createdAt', 'updatedAt'])
+        && data.id == commentId
+        && data.documentId == documentId
+        && isValidId(data.id)
+        && isValidId(data.documentId)
+        && isValidId(data.docOwnerId)
+        && data.docVisibility in ['private', 'shared']
+        && data.docSharedEmails is list && data.docSharedEmails.size() <= 15
+        && (data.docSharedEmails.size() == 0 || data.docSharedEmails[0] is string)
+        && data.sectionId is string && data.sectionId.size() >= 1 && data.sectionId.size() <= 128
+        && data.sectionHeading is string && data.sectionHeading.size() >= 1 && data.sectionHeading.size() <= 200
+        && isValidId(data.authorId)
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 120
+        && data.body is string && data.body.size() >= 1 && data.body.size() <= 2000
+        && data.resolved is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function canAccessDocumentData(docData) {
+      return isVerifiedEmail() && (
+        docData.ownerId == request.auth.uid ||
+        (docData.visibility == 'shared' && request.auth.token.email in docData.sharedEmails)
+      );
+    }
+
+    function parentDocument(documentId) {
+      return get(/databases/$(database)/documents/documents/$(documentId)).data;
+    }
+
+    function parentDocumentExists(documentId) {
+      return exists(/databases/$(database)/documents/documents/$(documentId));
+    }
+
+    // --- Collection Rules ---
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if false;
+      allow create: if isValidId(userId)
+        && isVerifiedEmail()
+        && isOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isVerifiedEmail()
+        && isOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().role == existing().role
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'storagePreference', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    match /templates/{templateId} {
+      allow get: if isValidId(templateId) && isVerifiedEmail() && existing().ownerId == request.auth.uid;
+      allow list: if isVerifiedEmail() && existing().ownerId == request.auth.uid;
+      allow create: if isValidId(templateId)
+        && isVerifiedEmail()
+        && isValidTemplate(incoming(), templateId)
+        && incoming().ownerId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(templateId)
+        && isVerifiedEmail()
+        && isValidTemplate(incoming(), templateId)
+        && existing().ownerId == request.auth.uid
+        && incoming().ownerId == existing().ownerId
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'category', 'description', 'tone', 'jurisdiction', 'sections', 'variables', 'updatedAt']);
+      allow delete: if isValidId(templateId) && isVerifiedEmail() && existing().ownerId == request.auth.uid;
+    }
+
+    match /documents/{documentId} {
+      allow get: if isValidId(documentId) && canAccessDocumentData(existing());
+      allow list: if isVerifiedEmail() && (
+        existing().ownerId == request.auth.uid ||
+        (existing().visibility == 'shared' && request.auth.token.email in existing().sharedEmails)
+      );
+      allow create: if isValidId(documentId)
+        && isVerifiedEmail()
+        && isValidDocument(incoming(), documentId)
+        && incoming().ownerId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(documentId)
+        && isVerifiedEmail()
+        && isValidDocument(incoming(), documentId)
+        && incoming().id == existing().id
+        && incoming().ownerId == existing().ownerId
+        && incoming().ownerName == existing().ownerName
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Owner full edit (including sharing, storage tier, and status transitions)
+          (
+            existing().ownerId == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'templateId', 'templateName', 'status', 'visibility', 'storageTier', 'sharedEmails', 'metadata', 'sections', 'currentVersion', 'wordCount', 'updatedAt'])
+          ) ||
+          // Action 2: Shared collaborator content & review edit (blocked once approved/archived)
+          (
+            existing().visibility == 'shared'
+            && request.auth.token.email in existing().sharedEmails
+            && existing().status in ['draft', 'in_review']
+            && incoming().status in ['draft', 'in_review']
+            && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'status', 'metadata', 'sections', 'currentVersion', 'wordCount', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(documentId) && isVerifiedEmail() && existing().ownerId == request.auth.uid;
+
+      match /versions/{versionId} {
+        allow get: if isValidId(documentId)
+          && isValidId(versionId)
+          && parentDocumentExists(documentId)
+          && canAccessDocumentData(parentDocument(documentId));
+        allow list: if isVerifiedEmail() && (
+          existing().docOwnerId == request.auth.uid ||
+          (existing().docVisibility == 'shared' && request.auth.token.email in existing().docSharedEmails)
+        );
+        allow create: if isValidId(documentId)
+          && isValidId(versionId)
+          && isVerifiedEmail()
+          && isValidVersion(incoming(), documentId, versionId)
+          && incoming().authorId == request.auth.uid
+          && incoming().createdAt == request.time
+          && parentDocumentExists(documentId)
+          && canAccessDocumentData(parentDocument(documentId))
+          && incoming().docOwnerId == parentDocument(documentId).ownerId
+          && incoming().docVisibility == parentDocument(documentId).visibility;
+        allow update: if isValidId(documentId)
+          && isValidId(versionId)
+          && isVerifiedEmail()
+          && isValidVersion(incoming(), documentId, versionId)
+          && parentDocumentExists(documentId)
+          && parentDocument(documentId).ownerId == request.auth.uid
+          && incoming().id == existing().id
+          && incoming().documentId == existing().documentId
+          && incoming().docOwnerId == existing().docOwnerId
+          && incoming().versionNumber == existing().versionNumber
+          && incoming().label == existing().label
+          && incoming().changeSummary == existing().changeSummary
+          && incoming().authorId == existing().authorId
+          && incoming().authorName == existing().authorName
+          && incoming().title == existing().title
+          && incoming().sections == existing().sections
+          && incoming().createdAt == existing().createdAt
+          && incoming().diff(existing()).affectedKeys().hasOnly(['docVisibility', 'docSharedEmails']);
+        allow delete: if false;
+      }
+
+      match /comments/{commentId} {
+        allow get: if isValidId(documentId)
+          && isValidId(commentId)
+          && parentDocumentExists(documentId)
+          && canAccessDocumentData(parentDocument(documentId));
+        allow list: if isVerifiedEmail() && (
+          existing().docOwnerId == request.auth.uid ||
+          (existing().docVisibility == 'shared' && request.auth.token.email in existing().docSharedEmails)
+        );
+        allow create: if isValidId(documentId)
+          && isValidId(commentId)
+          && isVerifiedEmail()
+          && isValidComment(incoming(), documentId, commentId)
+          && incoming().authorId == request.auth.uid
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && parentDocumentExists(documentId)
+          && canAccessDocumentData(parentDocument(documentId))
+          && incoming().docOwnerId == parentDocument(documentId).ownerId
+          && incoming().docVisibility == parentDocument(documentId).visibility;
+        allow update: if isValidId(documentId)
+          && isValidId(commentId)
+          && isVerifiedEmail()
+          && isValidComment(incoming(), documentId, commentId)
+          && incoming().id == existing().id
+          && incoming().documentId == existing().documentId
+          && incoming().docOwnerId == existing().docOwnerId
+          && incoming().authorId == existing().authorId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && parentDocumentExists(documentId)
+          && canAccessDocumentData(parentDocument(documentId))
+          && (
+            (
+              existing().authorId == request.auth.uid
+              && incoming().diff(existing()).affectedKeys().hasOnly(['body', 'resolved', 'updatedAt'])
+            ) ||
+            (
+              parentDocument(documentId).ownerId == request.auth.uid
+              && incoming().diff(existing()).affectedKeys().hasOnly(['resolved', 'updatedAt'])
+            ) ||
+            (
+              parentDocument(documentId).ownerId == request.auth.uid
+              && incoming().diff(existing()).affectedKeys().hasOnly(['docVisibility', 'docSharedEmails', 'updatedAt'])
+            )
+          );
+        allow delete: if isValidId(documentId)
+          && isValidId(commentId)
+          && isVerifiedEmail()
+          && parentDocumentExists(documentId)
+          && (existing().authorId == request.auth.uid || parentDocument(documentId).ownerId == request.auth.uid);
+      }
+    }
+  }
+}

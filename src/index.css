@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Syne", system-ui, sans-serif;
+  --font-script: "Pinyon Script", cursive;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Space Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+:root {
+  --bg: #fdfaf3;
+  --ink: #1a2e2a;
+  --accent: #d44c3c;
+  --glass: rgba(255, 255, 255, 0.58);
+  --ink-faint: rgba(26, 46, 42, 0.08);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--ink);
+    background-image: radial-gradient(var(--ink-faint) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-script {
+  font-family: var(--font-script);
+}
+
+.pane-glass {
+  background: var(--glass);
+  backdrop-filter: blur(12px);
+  border: 1.5px solid var(--ink);
+  border-radius: 12px;
+}
+
+.mono-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(26, 46, 42, 0.62);
+}
+
+.btn-cta {
+  background: var(--accent);
+  color: #ffffff;
+  border: 1.5px solid var(--ink);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+  box-shadow: 4px 4px 0 var(--ink);
+  transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 140ms cubic-bezier(0.16, 1, 0.3, 1), background-color 140ms ease;
+}
+
+.btn-cta:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0 var(--ink);
+}
+
+.btn-cta:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    background-image: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+}

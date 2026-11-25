@@ -1,0 +1,328 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated workspace user profile and cloud storage preference.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "role": {
+          "type": "string",
+          "enum": ["member"]
+        },
+        "storagePreference": {
+          "type": "string",
+          "enum": ["standard_cloud", "vault_restricted"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "role", "storagePreference", "createdAt", "updatedAt"]
+    },
+    "DocumentTemplate": {
+      "title": "DocumentTemplate",
+      "description": "Customizable contract or business report blueprint.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 140
+        },
+        "category": {
+          "type": "string",
+          "enum": ["contract", "report"]
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 600
+        },
+        "tone": {
+          "type": "string",
+          "enum": ["formal_legal", "executive_concise", "boardroom_analytical", "commercial_balanced"]
+        },
+        "jurisdiction": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "sections": {
+          "type": "array",
+          "description": "Ordered template section outlines (1-20 items)."
+        },
+        "variables": {
+          "type": "array",
+          "description": "Template placeholder variable names (0-20 items)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "ownerId", "name", "category", "description", "tone", "jurisdiction", "sections", "variables", "createdAt", "updatedAt"]
+    },
+    "ManagedDocument": {
+      "title": "ManagedDocument",
+      "description": "Drafted contract or business report stored in cloud workspace.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "category": {
+          "type": "string",
+          "enum": ["contract", "report"]
+        },
+        "templateId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "templateName": {
+          "type": "string",
+          "maxLength": 140
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "in_review", "approved", "archived"]
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["private", "shared"]
+        },
+        "storageTier": {
+          "type": "string",
+          "enum": ["standard_cloud", "vault_restricted"]
+        },
+        "sharedEmails": {
+          "type": "array",
+          "description": "Collaborator emails with edit access (max 15)."
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Structured contract or report fields."
+        },
+        "sections": {
+          "type": "array",
+          "description": "Ordered document sections (1-30 items)."
+        },
+        "currentVersion": {
+          "type": "integer"
+        },
+        "wordCount": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "ownerId", "ownerName", "title", "category", "templateId", "templateName", "status", "visibility", "storageTier", "sharedEmails", "metadata", "sections", "currentVersion", "wordCount", "createdAt", "updatedAt"]
+    },
+    "DocumentVersion": {
+      "title": "DocumentVersion",
+      "description": "Immutable version snapshot for a managed document.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "documentId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "docOwnerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "docVisibility": {
+          "type": "string",
+          "enum": ["private", "shared"]
+        },
+        "docSharedEmails": {
+          "type": "array",
+          "description": "Mirror of parent sharedEmails for secure list queries."
+        },
+        "versionNumber": {
+          "type": "integer"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "changeSummary": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "authorId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "sections": {
+          "type": "array",
+          "description": "Snapshot sections (1-30 items)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "documentId", "docOwnerId", "docVisibility", "docSharedEmails", "versionNumber", "label", "changeSummary", "authorId", "authorName", "title", "sections", "createdAt"]
+    },
+    "DocumentComment": {
+      "title": "DocumentComment",
+      "description": "Collaborative review comment on a specific document section.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "documentId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "docOwnerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "docVisibility": {
+          "type": "string",
+          "enum": ["private", "shared"]
+        },
+        "docSharedEmails": {
+          "type": "array",
+          "description": "Mirror of parent sharedEmails for secure list queries."
+        },
+        "sectionId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "sectionHeading": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "authorId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "resolved": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "documentId", "docOwnerId", "docVisibility", "docSharedEmails", "sectionId", "sectionHeading", "authorId", "authorName", "body", "resolved", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User workspace profiles and default cloud storage preference."
+    },
+    "/templates/{templateId}": {
+      "schema": { "$ref": "#/entities/DocumentTemplate" },
+      "description": "User-customized contract and business report templates."
+    },
+    "/documents/{documentId}": {
+      "schema": { "$ref": "#/entities/ManagedDocument" },
+      "description": "Contracts and business reports with access control and storage tier."
+    },
+    "/documents/{documentId}/versions/{versionId}": {
+      "schema": { "$ref": "#/entities/DocumentVersion" },
+      "description": "Immutable version snapshots of document content."
+    },
+    "/documents/{documentId}/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/DocumentComment" },
+      "description": "Section-level review comments for real-time collaboration."
+    }
+  }
+}

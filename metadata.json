@@ -1,0 +1,8 @@
+{
+  "name": "VellumDesk",
+  "description": "Automated AI contract and business report drafting studio with customizable templates, secure cloud storage, real-time collaboration, version control, and PDF/DOCX export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
