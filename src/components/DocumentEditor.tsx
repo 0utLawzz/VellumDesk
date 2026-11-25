@@ -89,6 +89,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [dirty, setDirty] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [exportingDocx, setExportingDocx] = useState(false);
+  const [pdfDownloaded, setPdfDownloaded] = useState(false);
 
   const [refiningSectionId, setRefiningSectionId] = useState<string | null>(null);
   const [refineInstruction, setRefineInstruction] = useState('');
@@ -299,6 +300,13 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     }
   };
 
+  const handleDownloadPdf = () => {
+    exportDocumentToPdf(liveDocumentSnapshot);
+    setPdfDownloaded(true);
+    setExportMenuOpen(false);
+    window.setTimeout(() => setPdfDownloaded(false), 2000);
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Editor Toolbar */}
@@ -372,6 +380,16 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             {saving ? 'Saving...' : justSaved ? 'Saved' : 'Save'}
           </button>
 
+          <button
+            type="button"
+            onClick={handleDownloadPdf}
+            title="Convert sections and download formatted PDF"
+            className="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] rounded-sm whitespace-nowrap"
+          >
+            <FileText className="w-3.5 h-3.5 text-[#d44c3c]" />
+            {pdfDownloaded ? 'PDF Ready' : 'Download PDF'}
+          </button>
+
           <div className="relative">
             <button
               type="button"
@@ -386,10 +404,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
               <div className="absolute right-0 mt-1.5 w-52 bg-white border-[1.5px] border-[#1a2e2a] rounded-md shadow-[4px_4px_0_#1a2e2a] py-1.5 z-30">
                 <button
                   type="button"
-                  onClick={() => {
-                    exportDocumentToPdf(liveDocumentSnapshot);
-                    setExportMenuOpen(false);
-                  }}
+                  onClick={handleDownloadPdf}
                   className="w-full px-3.5 py-2 text-left text-xs text-[#1a2e2a] hover:bg-[#fdfaf3] flex items-center justify-between"
                 >
                   <span className="font-mono text-[11px] font-bold">PDF (.pdf)</span>

@@ -43,18 +43,23 @@ export function exportDocumentToPdf(doc: ManagedDocument): void {
   const pageHeight = pdf.internal.pageSize.getHeight();
   const marginX = 56;
   const maxWidth = pageWidth - marginX * 2;
-  let cursorY = 64;
+  let cursorY = 60;
 
   const ensureSpace = (needed: number) => {
     if (cursorY + needed > pageHeight - 64) {
       pdf.addPage();
-      cursorY = 64;
+      cursorY = 60;
     }
   };
 
+  // Top accent rule
+  pdf.setDrawColor(212, 76, 60); // #d44c3c
+  pdf.setLineWidth(2);
+  pdf.line(marginX, cursorY - 18, marginX + 48, cursorY - 18);
+
   // Document kicker
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(9);
+  pdf.setFontSize(8.5);
   pdf.setTextColor(71, 85, 105);
   const categoryLabel =
     doc.category === 'contract' ? 'COMMERCIAL AGREEMENT' : 'EXECUTIVE BUSINESS REPORT';
@@ -68,8 +73,8 @@ export function exportDocumentToPdf(doc: ManagedDocument): void {
   // Title
   pdf.setFont('times', 'bold');
   pdf.setFontSize(22);
-  pdf.setTextColor(15, 23, 42);
-  const titleLines = pdf.splitTextToSize(doc.title, maxWidth) as string[];
+  pdf.setTextColor(26, 46, 42); // #1a2e2a
+  const titleLines = pdf.splitTextToSize(doc.title || 'Untitled Document', maxWidth) as string[];
   for (const line of titleLines) {
     ensureSpace(28);
     pdf.text(line, marginX, cursorY);
@@ -79,10 +84,10 @@ export function exportDocumentToPdf(doc: ManagedDocument): void {
 
   // Metadata summary row
   const metaEntries = Object.entries(doc.metadata || {}).filter(
-    ([, v]) => typeof v === 'string' && v.trim().length > 0
+    ([k, v]) => k !== 'tone' && typeof v === 'string' && v.trim().length > 0
   );
   if (metaEntries.length > 0) {
-    pdf.setDrawColor(203, 213, 225);
+    pdf.setDrawColor(26, 46, 42);
     pdf.setLineWidth(0.75);
     pdf.line(marginX, cursorY, pageWidth - marginX, cursorY);
     cursorY += 16;
@@ -92,7 +97,10 @@ export function exportDocumentToPdf(doc: ManagedDocument): void {
     pdf.setTextColor(51, 65, 85);
 
     const summaryText = metaEntries
-      .map(([k, v]) => `${k.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())}: ${v}`)
+      .map(
+        ([k, v]) =>
+          `${k.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())}: ${v}`
+      )
       .join('   |   ');
     const metaLines = pdf.splitTextToSize(summaryText, maxWidth) as string[];
     for (const mLine of metaLines) {
@@ -101,10 +109,12 @@ export function exportDocumentToPdf(doc: ManagedDocument): void {
       cursorY += 14;
     }
     cursorY += 6;
+    pdf.setDrawColor(203, 213, 225);
     pdf.line(marginX, cursorY, pageWidth - marginX, cursorY);
     cursorY += 24;
   } else {
-    pdf.setDrawColor(203, 213, 225);
+    pdf.setDrawColor(26, 46, 42);
+    pdf.setLineWidth(0.75);
     pdf.line(marginX, cursorY, pageWidth - marginX, cursorY);
     cursorY += 24;
   }
@@ -114,8 +124,8 @@ export function exportDocumentToPdf(doc: ManagedDocument): void {
     ensureSpace(44);
     pdf.setFont('times', 'bold');
     pdf.setFontSize(13.5);
-    pdf.setTextColor(15, 23, 42);
-    const headingLines = pdf.splitTextToSize(section.heading, maxWidth) as string[];
+    pdf.setTextColor(26, 46, 42);
+    const headingLines = pdf.splitTextToSize(section.heading || 'Section', maxWidth) as string[];
     for (const hLine of headingLines) {
       ensureSpace(20);
       pdf.text(hLine, marginX, cursorY);
@@ -126,29 +136,35 @@ export function exportDocumentToPdf(doc: ManagedDocument): void {
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(10.5);
     pdf.setTextColor(30, 41, 59);
-    const paragraphs = section.body.split(/\n{2,}/);
+    const paragraphs = (section.body || '').split(/\n{2,}/);
     for (const para of paragraphs) {
       const trimmed = para.trim();
       if (!trimmed) continue;
-      const lines = pdf.splitTextToSize(trimmed, maxWidth) as string[];
-      for (const line of lines) {
-        ensureSpace(16);
-        pdf.text(line, marginX, cursorY);
-        cursorY += 15;
+      const singleLines = trimmed.split('\n');
+      for (const rawLine of singleLines) {
+        const wrapped = pdf.splitTextToSize(rawLine.trim(), maxWidth) as string[];
+        for (const line of wrapped) {
+          ensureSpace(16);
+          pdf.text(line, marginX, cursorY);
+          cursorY += 15;
+        }
       }
       cursorY += 8;
     }
     cursorY += 10;
   }
 
-  // Page numbers in footer
+  // Page numbers & document title in footer
   const totalPages = pdf.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     pdf.setPage(i);
+    pdf.setDrawColor(226, 232, 240);
+    pdf.setLineWidth(0.5);
+    pdf.line(marginX, pageHeight - 44, pageWidth - marginX, pageHeight - 44);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(8.5);
     pdf.setTextColor(100, 116, 139);
-    pdf.text(doc.title.slice(0, 60), marginX, pageHeight - 30);
+    pdf.text((doc.title || 'VellumDesk Document').slice(0, 64), marginX, pageHeight - 30);
     pdf.text(`Page ${i} of ${totalPages}`, pageWidth - marginX, pageHeight - 30, {
       align: 'right',
     });

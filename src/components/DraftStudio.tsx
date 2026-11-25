@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   FileCheck2,
   Loader2,
@@ -71,7 +71,32 @@ export const DraftStudio: React.FC<DraftStudioProps> = ({
   const [storageTier, setStorageTier] = useState<StorageTier>(defaultStorageTier);
   const [brief, setBrief] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationStage, setGenerationStage] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!generating) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setGenerationProgress((prev) => {
+        if (prev >= 86) return prev;
+        const step = prev < 35 ? 6 : prev < 65 ? 4 : 2;
+        const next = Math.min(86, prev + step);
+        if (next < 32) {
+          setGenerationStage('Preparing template blueprint & metadata...');
+        } else if (next < 68) {
+          setGenerationStage('AI drafting structured sections & clauses...');
+        } else {
+          setGenerationStage('Validating section formatting & summary...');
+        }
+        return next;
+      });
+    }, 320);
+
+    return () => window.clearInterval(timer);
+  }, [generating]);
 
   const handleSelectTemplate = (tpl: DocumentTemplate) => {
     setSelectedTemplateId(tpl.id);
@@ -113,6 +138,8 @@ export const DraftStudio: React.FC<DraftStudioProps> = ({
     e.preventDefault();
     if (!selectedTemplate) return;
     setGenerating(true);
+    setGenerationProgress(12);
+    setGenerationStage('Preparing template blueprint & metadata...');
     setError(null);
 
     try {
@@ -145,6 +172,9 @@ export const DraftStudio: React.FC<DraftStudioProps> = ({
         throw new Error(data.error || 'Failed to generate document draft.');
       }
 
+      setGenerationProgress(90);
+      setGenerationStage('Saving v1.0 draft & opening editor...');
+
       const generatedSections: DocumentSection[] = (data.sections || []).map(
         (s: { heading: string; body: string }, idx: number) => ({
           id: makeSafeId(`sec_${idx + 1}`),
@@ -154,6 +184,7 @@ export const DraftStudio: React.FC<DraftStudioProps> = ({
         })
       );
 
+      setGenerationProgress(100);
       await onDraftGenerated({
         title: data.title || title.trim() || selectedTemplate.name,
         category: selectedTemplate.category,
@@ -167,6 +198,8 @@ export const DraftStudio: React.FC<DraftStudioProps> = ({
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to generate document.');
+      setGenerationProgress(0);
+      setGenerationStage('');
     } finally {
       setGenerating(false);
     }
@@ -470,6 +503,40 @@ export const DraftStudio: React.FC<DraftStudioProps> = ({
             </div>
           </div>
 
+          {generating && (
+            <div
+              className="p-4 bg-[#fdfaf3] border-[1.5px] border-[#1a2e2a] rounded-md space-y-2.5"
+              aria-live="polite"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-[11px] uppercase font-bold text-[#1a2e2a] flex items-center gap-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[#d44c3c]" />
+                  {generationStage || 'Generating draft...'}
+                </span>
+                <span className="font-mono text-xs font-bold text-[#d44c3c] tabular-nums">
+                  {generationProgress}%
+                </span>
+              </div>
+              <div
+                role="progressbar"
+                aria-label="AI document generation progress"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={generationProgress}
+                className="w-full h-3 bg-white border border-[#1a2e2a] rounded-sm overflow-hidden"
+              >
+                <div
+                  className="h-full bg-[#d44c3c] transition-all duration-300 ease-out"
+                  style={{ width: `${generationProgress}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between font-mono text-[10px] uppercase text-[#1a2e2a]/60">
+                <span>{selectedTemplate?.sections.length || 0} sections</span>
+                <span>{tone.replace('_', ' ')}</span>
+              </div>
+            </div>
+          )}
+
           <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <p className="text-xs text-[#1a2e2a]/65">
               {isAuthenticated
@@ -484,7 +551,7 @@ export const DraftStudio: React.FC<DraftStudioProps> = ({
               {generating ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Drafting...
+                  Drafting ({generationProgress}%)
                 </>
               ) : (
                 <>
