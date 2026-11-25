@@ -60,6 +60,7 @@ interface DocumentEditorProps {
   }) => Promise<void>;
   onAuditResult: (result: DocumentAuditResult) => void;
   onSwitchToAuditTab: () => void;
+  onRegisterSaveHandler?: (handler: (() => Promise<void>) | null) => void;
 }
 
 export const DocumentEditor: React.FC<DocumentEditorProps> = ({
@@ -77,12 +78,14 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   onSaveDocument,
   onAuditResult,
   onSwitchToAuditTab,
+  onRegisterSaveHandler,
 }) => {
   const [title, setTitle] = useState(initialDoc.title);
   const [sections, setSections] = useState<DocumentSection[]>(initialDoc.sections);
   const [status, setStatus] = useState<DocumentStatus>(initialDoc.status);
 
   const [saving, setSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [exportingDocx, setExportingDocx] = useState(false);
@@ -173,6 +176,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   };
 
   const handleSave = async (createSnapshot = false, snapshotLabel?: string) => {
+    if (saving || isLocked) return;
     setSaving(true);
     try {
       await onSaveDocument({
@@ -186,10 +190,21 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
           : 'Saved working draft.',
       });
       setDirty(false);
+      setJustSaved(true);
+      window.setTimeout(() => setJustSaved(false), 2000);
     } finally {
       setSaving(false);
     }
   };
+
+  const latestSaveRef = useRef<() => Promise<void>>(async () => {});
+  latestSaveRef.current = () => handleSave(false);
+
+  useEffect(() => {
+    if (!onRegisterSaveHandler) return;
+    onRegisterSaveHandler(() => latestSaveRef.current());
+    return () => onRegisterSaveHandler(null);
+  }, [onRegisterSaveHandler]);
 
   const handleRefineSection = async (section: DocumentSection, customInstruction?: string) => {
     const instr = (customInstruction ?? refineInstruction).trim();
@@ -346,6 +361,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             type="button"
             onClick={() => handleSave(false)}
             disabled={saving || isLocked}
+            title="Save working draft (Ctrl+S)"
             className="btn-cta inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[10px] rounded-sm whitespace-nowrap disabled:opacity-50"
           >
             {saving ? (
@@ -353,7 +369,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             ) : (
               <Save className="w-3.5 h-3.5" />
             )}
-            {saving ? 'Saving...' : 'Save'}
+            {saving ? 'Saving...' : justSaved ? 'Saved' : 'Save'}
           </button>
 
           <div className="relative">

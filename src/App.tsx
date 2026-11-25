@@ -54,6 +54,10 @@ function WorkspaceApp() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   const [view, setView] = useState<AppView>('documents');
+  const [searchOpen, setSearchOpen] = useState(true);
+  const [searchFocusTick, setSearchFocusTick] = useState(0);
+  const [hotkeyNotice, setHotkeyNotice] = useState<string | null>(null);
+  const editorSaveHandlerRef = useRef<(() => Promise<void>) | null>(null);
 
   // Cloud state
   const [cloudDocs, setCloudDocs] = useState<ManagedDocument[]>([]);
@@ -281,13 +285,79 @@ function WorkspaceApp() {
     setView('editor');
   };
 
-  const handleBackToDocuments = () => {
+  const handleBackToDocuments = useCallback(() => {
     setActiveDocId(null);
     const url = new URL(window.location.href);
     url.searchParams.delete('doc');
     window.history.replaceState({}, '', url.toString());
     setView('documents');
-  };
+  }, []);
+
+  const flashHotkeyNotice = useCallback((message: string) => {
+    setHotkeyNotice(message);
+    window.setTimeout(() => {
+      setHotkeyNotice((curr) => (curr === message ? null : curr));
+    }, 2200);
+  }, []);
+
+  const handleToggleSearch = useCallback((nextOpen?: boolean) => {
+    setSearchOpen((prev) => {
+      const target = typeof nextOpen === 'boolean' ? nextOpen : !prev;
+      if (target) {
+        setSearchFocusTick((t) => t + 1);
+      }
+      return target;
+    });
+  }, []);
+
+  const handleRegisterSaveHandler = useCallback(
+    (handler: (() => Promise<void>) | null) => {
+      editorSaveHandlerRef.current = handler;
+    },
+    []
+  );
+
+  // Global keyboard shortcuts: Ctrl/Cmd+S (Save), Ctrl/Cmd+N (New Draft), Ctrl/Cmd+F (Toggle Search)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const key = e.key.toLowerCase();
+
+      if (key === 's') {
+        e.preventDefault();
+        if (view === 'editor' && activeDocument && editorSaveHandlerRef.current) {
+          void editorSaveHandlerRef.current();
+          flashHotkeyNotice('Draft saved (Ctrl+S)');
+        }
+      } else if (key === 'n') {
+        e.preventDefault();
+        setCustomizerTarget(undefined);
+        setView('studio');
+        flashHotkeyNotice('Draft Studio opened (Ctrl+N)');
+      } else if (key === 'f') {
+        e.preventDefault();
+        setCustomizerTarget(undefined);
+        if (view !== 'documents') {
+          handleBackToDocuments();
+          setSearchOpen(true);
+          setSearchFocusTick((t) => t + 1);
+          flashHotkeyNotice('Search opened (Ctrl+F)');
+        } else {
+          setSearchOpen((prev) => {
+            const next = !prev;
+            if (next) {
+              setSearchFocusTick((t) => t + 1);
+            }
+            flashHotkeyNotice(next ? 'Search opened (Ctrl+F)' : 'Search hidden (Ctrl+F)');
+            return next;
+          });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [view, activeDocument, handleBackToDocuments, flashHotkeyNotice]);
 
   const handleSaveCustomTemplate = async (template: DocumentTemplate) => {
     if (user) {
@@ -594,6 +664,7 @@ function WorkspaceApp() {
               <button
                 type="button"
                 onClick={() => setView('studio')}
+                title="Open Draft Studio (Ctrl+N)"
                 className={`w-full px-4 py-3 rounded-lg text-sm font-semibold flex items-center justify-between transition-colors ${
                   view === 'studio'
                     ? 'bg-[#1a2e2a] text-[#fdfaf3]'
@@ -601,6 +672,7 @@ function WorkspaceApp() {
                 }`}
               >
                 <span>Draft Studio</span>
+                <span className="font-mono text-[10px] opacity-65">Ctrl+N</span>
               </button>
 
               <button
@@ -666,6 +738,9 @@ function WorkspaceApp() {
               sharedDocuments={visibleSharedDocs}
               loading={Boolean(user && cloudLoading)}
               isAuthenticated={Boolean(user)}
+              searchOpen={searchOpen}
+              searchFocusTick={searchFocusTick}
+              onToggleSearch={handleToggleSearch}
               onOpenDocument={handleOpenDocument}
               onCreateNew={() => setView('studio')}
               onDeleteDocument={handleDeleteDocument}
@@ -700,6 +775,7 @@ function WorkspaceApp() {
               onSaveDocument={handleSaveDocument}
               onAuditResult={setAuditResult}
               onSwitchToAuditTab={() => setInspectorTab('audit')}
+              onRegisterSaveHandler={handleRegisterSaveHandler}
             />
           )}
 
@@ -974,7 +1050,9 @@ function WorkspaceApp() {
       {/* Quiet Footer */}
       <footer className="no-print flex flex-wrap items-center justify-between gap-2 px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-[#1a2e2a]/55 shrink-0">
         <span>VellumDesk Studio</span>
-        <span>Contracts · Business Reports · PDF & DOCX Export</span>
+        <span className={hotkeyNotice ? 'text-[#d44c3c] font-bold' : ''}>
+          {hotkeyNotice || 'Shortcuts: Ctrl+S Save · Ctrl+N New Draft · Ctrl+F Search'}
+        </span>
         <span>{user ? 'Storage: Cloud Firestore' : 'Storage: Local Session'}</span>
       </footer>
 

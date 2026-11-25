@@ -1,18 +1,23 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUpRight,
   Lock,
   Search,
   Trash2,
   Users,
+  X,
 } from 'lucide-react';
 import type { ManagedDocument } from '../types/document';
+import { fuzzyFilterDocuments } from '../lib/fuzzySearch';
 
 interface DocumentsIndexProps {
   documents: ManagedDocument[];
   sharedDocuments: ManagedDocument[];
   loading: boolean;
   isAuthenticated: boolean;
+  searchOpen: boolean;
+  searchFocusTick: number;
+  onToggleSearch: (nextOpen?: boolean) => void;
   onOpenDocument: (doc: ManagedDocument) => void;
   onCreateNew: () => void;
   onDeleteDocument: (docId: string) => void;
@@ -66,12 +71,25 @@ export const DocumentsIndex: React.FC<DocumentsIndexProps> = ({
   sharedDocuments,
   loading,
   isAuthenticated,
+  searchOpen,
+  searchFocusTick,
+  onToggleSearch,
   onOpenDocument,
   onCreateNew,
   onDeleteDocument,
 }) => {
   const [filter, setFilter] = useState<FilterTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (searchOpen) {
+      const id = window.requestAnimationFrame(() => {
+        searchInputRef.current?.focus();
+      });
+      return () => window.cancelAnimationFrame(id);
+    }
+  }, [searchOpen, searchFocusTick]);
 
   const combinedDocs = useMemo(() => {
     const map = new Map<string, ManagedDocument>();
@@ -83,18 +101,18 @@ export const DocumentsIndex: React.FC<DocumentsIndexProps> = ({
   }, [documents, sharedDocuments]);
 
   const filteredDocs = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return combinedDocs.filter((doc) => {
+    const tabFiltered = combinedDocs.filter((doc) => {
       if (filter === 'contract' && doc.category !== 'contract') return false;
       if (filter === 'report' && doc.category !== 'report') return false;
       if (filter === 'shared' && doc.visibility !== 'shared') return false;
-      if (!q) return true;
-      return (
-        doc.title.toLowerCase().includes(q) ||
-        doc.templateName.toLowerCase().includes(q) ||
-        doc.ownerName.toLowerCase().includes(q)
-      );
+      return true;
     });
+
+    if (!searchQuery.trim()) {
+      return tabFiltered;
+    }
+
+    return fuzzyFilterDocuments(tabFiltered, searchQuery).map((match) => match.item);
   }, [combinedDocs, filter, searchQuery]);
 
   return (
@@ -117,42 +135,94 @@ export const DocumentsIndex: React.FC<DocumentsIndexProps> = ({
         </p>
       </div>
 
-      {/* Monospace Search & Segmented Filter Controls */}
+      {/* Monospace Fuzzy Search & Segmented Filter Controls */}
       <div className="mt-7 mb-6 space-y-3">
-        <div className="relative">
-          <Search className="w-4 h-4 text-[#1a2e2a] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="FILTER_DOCUMENTS_BY_TITLE_OR_TEMPLATE..."
-            className="w-full pl-12 pr-4 py-3.5 bg-white/60 border-[1.5px] border-[#1a2e2a] rounded font-mono text-xs sm:text-sm text-[#1a2e2a] placeholder:text-[#1a2e2a]/45 focus:outline-none focus:bg-white"
-          />
-        </div>
+        {searchOpen && (
+          <div className="relative">
+            <Search className="w-4 h-4 text-[#1a2e2a] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  if (searchQuery) {
+                    setSearchQuery('');
+                  } else {
+                    onToggleSearch(false);
+                  }
+                }
+              }}
+              aria-label="Fuzzy search documents by title or category"
+              placeholder="FUZZY_SEARCH_BY_TITLE_OR_CATEGORY (e.g. 'msa', 'contract', 'q4 report')..."
+              className="w-full pl-12 pr-20 py-3.5 bg-white/60 border-[1.5px] border-[#1a2e2a] rounded font-mono text-xs sm:text-sm text-[#1a2e2a] placeholder:text-[#1a2e2a]/45 focus:outline-none focus:bg-white"
+            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    searchInputRef.current?.focus();
+                  }}
+                  aria-label="Clear search"
+                  className="p-1 text-[#1a2e2a]/60 hover:text-[#d44c3c] transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => onToggleSearch(false)}
+                title="Hide search bar (Ctrl+F)"
+                className="px-1.5 py-0.5 font-mono text-[10px] uppercase border border-[#1a2e2a]/35 text-[#1a2e2a]/70 hover:border-[#1a2e2a] hover:text-[#1a2e2a] rounded-sm"
+              >
+                Esc
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex items-center gap-1 p-1 bg-white/70 border border-[#1a2e2a] rounded-md">
-            {(
-              [
-                { id: 'all', label: 'All' },
-                { id: 'contract', label: 'Contracts' },
-                { id: 'report', label: 'Reports' },
-                { id: 'shared', label: 'Shared' },
-              ] as const
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setFilter(tab.id)}
-                className={`px-3 py-1 text-[11px] font-mono uppercase font-bold rounded-sm transition-colors whitespace-nowrap shrink-0 ${
-                  filter === tab.id
-                    ? 'bg-[#1a2e2a] text-[#fdfaf3]'
-                    : 'text-[#1a2e2a] hover:bg-[#1a2e2a]/10'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-1 p-1 bg-white/70 border border-[#1a2e2a] rounded-md">
+              {(
+                [
+                  { id: 'all', label: 'All' },
+                  { id: 'contract', label: 'Contracts' },
+                  { id: 'report', label: 'Reports' },
+                  { id: 'shared', label: 'Shared' },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setFilter(tab.id)}
+                  className={`px-3 py-1 text-[11px] font-mono uppercase font-bold rounded-sm transition-colors whitespace-nowrap shrink-0 ${
+                    filter === tab.id
+                      ? 'bg-[#1a2e2a] text-[#fdfaf3]'
+                      : 'text-[#1a2e2a] hover:bg-[#1a2e2a]/10'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onToggleSearch(!searchOpen)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono uppercase font-bold border border-[#1a2e2a] rounded-md transition-colors whitespace-nowrap ${
+                searchOpen
+                  ? 'bg-[#fdfaf3] text-[#1a2e2a]'
+                  : 'bg-white/70 text-[#1a2e2a] hover:bg-[#1a2e2a] hover:text-[#fdfaf3]'
+              }`}
+            >
+              <Search className="w-3 h-3" />
+              <span>{searchOpen ? 'Hide Search' : 'Search'}</span>
+              <span className="opacity-60 text-[10px]">[Ctrl+F]</span>
+            </button>
           </div>
 
           <span className="font-mono text-[11px] uppercase tracking-wider text-[#1a2e2a]/60 tabular-nums">
